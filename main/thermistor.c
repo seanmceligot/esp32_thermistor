@@ -32,25 +32,24 @@ static const char *TAG = "Thermistor";
 
 static esp_adc_cal_characteristics_t adc1_chars;
 
-static bool adc_calibration_init(void) {
-    esp_err_t ret;
-    bool cali_enable = false;
+static esp_err_t adc_calibration_init(bool* cali_enable) {
+    esp_err_t err;
 
-    ret = esp_adc_cal_check_efuse(ADC_CALI_SCHEME);
-    if (ret == ESP_ERR_NOT_SUPPORTED) {
+    err = esp_adc_cal_check_efuse(ADC_CALI_SCHEME);
+    if (err == ESP_ERR_NOT_SUPPORTED) {
         ESP_LOGW(TAG, "Calibration scheme not supported, skip software calibration");
-    } else if (ret == ESP_ERR_INVALID_VERSION) {
+    } else if (err == ESP_ERR_INVALID_VERSION) {
         ESP_LOGW(TAG, "eFuse not burnt, skip software calibration");
-    } else if (ret == ESP_OK) {
-        cali_enable = true;
+    } else if (err == ESP_OK) {
+        *cali_enable = true;
         esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN, ADC_WIDTH_BIT_DEFAULT, 0, &adc1_chars);
     } else {
         ESP_LOGE(TAG, "Invalid arg");
     }
 
-    return cali_enable;
+    return err;
 }
-int read_adc(bool cali_enable) {
+double read_adc(bool cali_enable) {
         int adc_raw = adc1_get_raw(TERMISTOR_CHANNEL);
         //ESP_LOGI(TAG_CH[0][0], "raw  data: %d", adc_raw[0][0]);
         uint32_t voltage = 0;
@@ -73,14 +72,20 @@ int read_adc(bool cali_enable) {
         Tc = T - 273.15;                   // Celsius
         Tf = Tc * 9 / 5 + 32;              // Fahrenheit
 
-        ESP_LOGI("temp", "%f f voltage %d channel %d", Tf, voltage, TERMISTOR_CHANNEL);
-        return adc_raw;
+        ESP_LOGI("temp", "%f f voltage %d adc %d channel %d", Tf, voltage, adc_raw, TERMISTOR_CHANNEL);
+        return Tf;
 }
-bool setup_adc(void) {
-    ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_DEFAULT));
-    ESP_ERROR_CHECK(adc1_config_channel_atten(TERMISTOR_CHANNEL, ADC_ATTEN));
+esp_err_t setup_adc(bool* cali_enable) {
+    esp_err_t err = adc1_config_width(ADC_WIDTH_BIT_DEFAULT);
+    if (err != ESP_OK) {
+	return err;
+    }
+    err = adc1_config_channel_atten(TERMISTOR_CHANNEL, ADC_ATTEN);
+    if (err != ESP_OK) {
+	return err;
+    }
 
     ESP_LOGI(TAG, "start ADC");
-    bool cali_enable = adc_calibration_init();
-    return cali_enable;
+    err = adc_calibration_init(cali_enable);
+    return err;
 }

@@ -21,17 +21,15 @@
     can be sorted based on Authentication Mode or Signal Strength. The priority
     for the Authentication mode is:  WPA2 > WPA > WEP > Open
 */
-#include "freertos/FreeRTOS.h"
-#include "freertos/event_groups.h"
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "nvs_flash.h"
-#include "esp_netif.h"
 
 /* Set the SSID and Password via project configuration, or can set directly here */
-#define DEFAULT_SSID CONFIG_EXAMPLE_WIFI_SSID
-#define DEFAULT_PWD CONFIG_EXAMPLE_WIFI_PASSWORD
+
+#define ESP_WIFI_SSID CONFIG_ESP_WIFI_SSID 
+#define ESP_WIFI_PASSWORD CONFIG_ESP_WIFI_PASSWORD 
 
 #if CONFIG_EXAMPLE_WIFI_ALL_CHANNEL_SCAN
 #define DEFAULT_SCAN_METHOD WIFI_ALL_CHANNEL_SCAN
@@ -80,27 +78,49 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t e
         ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
     }
 }
-static void init_nonviolile_flash() {
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_LOGW(TAG, "erase nonvolitile flash: nvs_flash_init returned: %d", ret );
-        ESP_ERROR_CHECK(nvs_flash_erase());
+static esp_err_t init_nonviolile_flash() {
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_LOGW(TAG, "erase nonvolitile flash: nvs_flash_init returned: %d", err);
+        err = nvs_flash_erase();
+        if (err != ESP_OK) {
+          return err;
+        }
         ESP_LOGW(TAG, "reinit nonvolitile flash: ");
-        ret = nvs_flash_init();
+        err = nvs_flash_init();
     }
-    ESP_ERROR_CHECK( ret );
+    return err;
 }
 /* Initialize Wi-Fi as sta and set scan method */
-void start_wifi(esp_event_handler_t* ip_event_handler) {
-    init_nonviolile_flash();
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+esp_err_t start_wifi(esp_event_handler_t ip_event_handler) {
+    esp_err_t err;
+    err = init_nonviolile_flash();
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = esp_netif_init();
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = esp_event_loop_create_default();
+    if (err != ESP_OK) {
+        return err;
+    }
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    err = esp_wifi_init(&cfg);
+    if (err != ESP_OK) {
+        return err;
+    }
 
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, ip_event_handler, NULL, NULL));
+    err = esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, NULL);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, ip_event_handler, NULL, NULL);
+    if (err != ESP_OK) {
+        return err;
+    }
 
     // Initialize default station as network interface instance (esp-netif)
     esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
@@ -109,16 +129,23 @@ void start_wifi(esp_event_handler_t* ip_event_handler) {
     // Initialize and start WiFi
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid = DEFAULT_SSID,
-            .password = DEFAULT_PWD,
+            .ssid = ESP_WIFI_SSID,
+            .password = ESP_WIFI_PASSWORD,
             .scan_method = DEFAULT_SCAN_METHOD,
             .sort_method = DEFAULT_SORT_METHOD,
             .threshold.rssi = DEFAULT_RSSI,
             .threshold.authmode = DEFAULT_AUTHMODE,
         },
     };
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
+    err = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = esp_wifi_start();
+    return err;
 }
 

@@ -13,20 +13,7 @@
 #include <stddef.h>
 #include <string.h>
 #include "esp_wifi.h"
-#include "esp_system.h"
-#include "nvs_flash.h"
 #include "esp_event.h"
-#include "esp_netif.h"
-#include "protocol_examples_common.h"
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/semphr.h"
-#include "freertos/queue.h"
-
-#include "lwip/sockets.h"
-#include "lwip/dns.h"
-#include "lwip/netdb.h"
 
 #include "esp_log.h"
 
@@ -38,10 +25,10 @@ static void log_error_if_nonzero(const char *message, int error_code)
         ESP_LOGE(TAG, "Last error %s: 0x%x", message, error_code);
     }
 }
-int mqtt_send(esp_mqtt_client_handle_t client, int value) {
-    int length = snprintf( NULL, 0, "%d", value );
-    char* strvalue = malloc( length + 1 );
-    snprintf( strvalue, length + 1, "%d", value );
+int mqtt_send(esp_mqtt_client_handle_t client, double value) {
+    int length = snprintf( NULL, 0, "%f", value );
+    char* strvalue = (char*) malloc( length + 1 );
+    snprintf( strvalue, length + 1, "%f", value );
     int msg_id = esp_mqtt_client_publish(client, "/topic/thermistor", strvalue, 0, 1, 0);
     free(strvalue);
     return msg_id;
